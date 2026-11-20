@@ -1,206 +1,92 @@
 <script>
     (function () {
-      const canvas = document.getElementById('particle-globe');
+      const canvas = document.getElementById("particle-globe");
       if (!canvas) return;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
       const W = canvas.width, H = canvas.height;
       const cx = W / 2, cy = H / 2, R = 132;
-
       function latLonToVec(latDeg, lonDeg) {
-        const lat = (latDeg * Math.PI) / 180;
-        const lon = (lonDeg * Math.PI) / 180;
-        const cosLat = Math.cos(lat);
-        return {
-          x: cosLat * Math.cos(lon),
-          y: -Math.sin(lat),
-          z: cosLat * Math.sin(lon)
-        };
+        const lat = (latDeg * Math.PI) / 180, lon = (lonDeg * Math.PI) / 180, cosLat = Math.cos(lat);
+        return { x: cosLat * Math.cos(lon), y: -Math.sin(lat), z: cosLat * Math.sin(lon) };
       }
-
-      // Approximate [lat, lon] polygons for recognizable continents
       const continents = [
-        // North America
         [[65,-165],[70,-130],[60,-95],[48,-65],[30,-82],[18,-96],[28,-112],[48,-125]],
-        // South America
         [[11,-74],[5,-50],[-18,-39],[-38,-62],[-54,-68],[-42,-73],[-15,-76],[-2,-80]],
-        // Europe
         [[70,25],[60,5],[43,-9],[37,-6],[44,12],[38,24],[47,39],[58,30],[66,26]],
-        // Africa
         [[36,10],[31,32],[12,51],[-12,40],[-34,20],[-25,15],[5,4],[15,-17],[28,-13]],
-        // Asia
         [[72,60],[68,140],[55,160],[36,140],[22,114],[10,104],[22,88],[8,77],[25,56],[41,29],[55,38],[64,58]],
-        // Australia
         [[-12,131],[-16,145],[-28,153],[-38,145],[-34,115],[-20,114]]
       ];
-
       function pointInPoly(lat, lon, poly) {
         let inside = false;
         for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-          const xi = poly[i][1], yi = poly[i][0];
-          const xj = poly[j][1], yj = poly[j][0];
-          const intersect =
-            yi > lat !== yj > lat &&
-            lon < ((xj - xi) * (lat - yi)) / (yj - yi + 1e-9) + xi;
-          if (intersect) inside = !inside;
+          const xi = poly[i][1], yi = poly[i][0], xj = poly[j][1], yj = poly[j][0];
+          if (((yi > lat) !== (yj > lat)) && (lon < ((xj - xi) * (lat - yi)) / (yj - yi + 1e-9) + xi)) inside = !inside;
         }
         return inside;
       }
-
-      function isLand(lat, lon) {
-        return continents.some(poly => pointInPoly(lat, lon, poly));
-      }
-
+      const isLand = (lat, lon) => continents.some(poly => pointInPoly(lat, lon, poly));
       const globePoints = [];
-      // Latitude/longitude grid + denser continental landmass dots
       for (let lat = -75; lat <= 75; lat += 6) {
         const stepLon = Math.max(6, Math.round(7 / Math.max(0.25, Math.cos((lat * Math.PI) / 180))));
         for (let lon = -180; lon < 180; lon += stepLon) {
           const land = isLand(lat, lon);
           if (land || (Math.abs(lat) % 30 === 0 && Math.abs(lon) % 30 === 0)) {
-            const jitterLat = lat + (Math.sin(lat * 13.7 + lon * 7.3) * 1.4);
-            const jitterLon = lon + (Math.cos(lat * 5.1 + lon * 11.9) * 1.4);
-            globePoints.push({
-              pos: latLonToVec(jitterLat, jitterLon),
-              land: land
-            });
+            globePoints.push({ pos: latLonToVec(lat + Math.sin(lat * 13.7 + lon * 7.3) * 1.4, lon + Math.cos(lat * 5.1 + lon * 11.9) * 1.4), land });
           }
         }
       }
-
-      // AI System Hub Nodes (lat, lon)
       const hubs = [
-        { name: 'NA-AI', pos: latLonToVec(37.7, -122.4) },
-        { name: 'NY-FIN', pos: latLonToVec(40.7, -74.0) },
-        { name: 'EU-HUB', pos: latLonToVec(51.5, -0.1) },
-        { name: 'ME-TRD', pos: latLonToVec(25.2, 55.3) },
-        { name: 'SA-OPS', pos: latLonToVec(31.5, 74.3) },
-        { name: 'AP-SYS', pos: latLonToVec(1.35, 103.8) },
-        { name: 'JP-NET', pos: latLonToVec(35.7, 139.7) }
+        latLonToVec(37.7, -122.4), latLonToVec(40.7, -74.0), latLonToVec(51.5, -0.1),
+        latLonToVec(25.2, 55.3), latLonToVec(31.5, 74.3), latLonToVec(1.35, 103.8), latLonToVec(35.7, 139.7)
       ];
-
-      // Connection links between AI hubs
-      const links = [
-        [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [0, 6], [2, 4]
-      ];
-
+      const links = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[0,6],[2,4]];
       function rotateVec(v, cosA, sinA, cosT, sinT) {
-        const rx = v.x * cosA - v.z * sinA;
-        const rz0 = v.x * sinA + v.z * cosA;
-        const ry = v.y * cosT - rz0 * sinT;
-        const rz = v.y * sinT + rz0 * cosT;
+        const rx = v.x * cosA - v.z * sinA, rz0 = v.x * sinA + v.z * cosA;
+        const ry = v.y * cosT - rz0 * sinT, rz = v.y * sinT + rz0 * cosT;
         const scale = 330 / (330 - rz * R);
-        return {
-          sx: cx + rx * R * scale,
-          sy: cy + ry * R * scale,
-          z: rz,
-          scale: scale
-        };
+        return { sx: cx + rx * R * scale, sy: cy + ry * R * scale, z: rz, scale };
       }
-
-      let angle = 0.4;
-      let pulseT = 0;
-
+      let angle = 0.4, pulseT = 0;
       function render() {
         ctx.clearRect(0, 0, W, H);
-
-        // Outer ambient aura
         const glow = ctx.createRadialGradient(cx, cy, 18, cx, cy, R * 1.38);
-        glow.addColorStop(0, 'rgba(139, 92, 246, 0.24)');
-        glow.addColorStop(0.55, 'rgba(56, 189, 248, 0.08)');
-        glow.addColorStop(1, 'rgba(7, 9, 20, 0)');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(cx, cy, R * 1.38, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Subtle equator / orbital ring
-        ctx.strokeStyle = 'rgba(139, 92, 246, 0.22)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, R * 1.12, R * 0.34, -0.25, 0, Math.PI * 2);
-        ctx.stroke();
-
-        const cosA = Math.cos(angle), sinA = Math.sin(angle);
-        const tilt = 0.26;
-        const cosT = Math.cos(tilt), sinT = Math.sin(tilt);
-
-        // Draw world points
-        const projectedPts = globePoints.map(pt => ({
-          p: rotateVec(pt.pos, cosA, sinA, cosT, sinT),
-          land: pt.land
-        })).sort((a, b) => a.p.z - b.p.z);
-
-        for (const item of projectedPts) {
-          const { sx, sy, z, scale } = item.p;
-          const depthAlpha = Math.max(0.12, (z + 1) * 0.46);
-          if (item.land) {
-            ctx.fillStyle = z > 0.1 ? `rgba(196, 181, 253, ${Math.min(0.95, depthAlpha * 1.25)})` : `rgba(124, 58, 237, ${depthAlpha * 0.7})`;
-            ctx.beginPath();
-            ctx.arc(sx, sy, 1.65 * scale, 0, Math.PI * 2);
-            ctx.fill();
-          } else {
-            ctx.fillStyle = `rgba(99, 102, 241, ${depthAlpha * 0.35})`;
-            ctx.beginPath();
-            ctx.arc(sx, sy, 0.9 * scale, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-
-        // Project AI nodes
-        const projectedHubs = hubs.map(h => rotateVec(h.pos, cosA, sinA, cosT, sinT));
-
-        // Draw curved AI network arcs & animated signal packets
+        glow.addColorStop(0, "rgba(139, 92, 246, 0.24)");
+        glow.addColorStop(0.55, "rgba(56, 189, 248, 0.08)");
+        glow.addColorStop(1, "rgba(7, 9, 20, 0)");
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(cx, cy, R * 1.38, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(139, 92, 246, 0.22)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(cx, cy, R * 1.12, R * 0.34, -0.25, 0, Math.PI * 2); ctx.stroke();
+        const cosA = Math.cos(angle), sinA = Math.sin(angle), tilt = 0.26, cosT = Math.cos(tilt), sinT = Math.sin(tilt);
+        globePoints.map(pt => ({ p: rotateVec(pt.pos, cosA, sinA, cosT, sinT), land: pt.land }))
+          .sort((a, b) => a.p.z - b.p.z)
+          .forEach(({ p: { sx, sy, z, scale }, land }) => {
+            const a = Math.max(0.12, (z + 1) * 0.46);
+            ctx.fillStyle = land ? (z > 0.1 ? "rgba(196, 181, 253, " + Math.min(0.95, a * 1.25) + ")" : "rgba(124, 58, 237, " + (a * 0.7) + ")") : "rgba(99, 102, 241, " + (a * 0.35) + ")";
+            ctx.beginPath(); ctx.arc(sx, sy, (land ? 1.65 : 0.9) * scale, 0, Math.PI * 2); ctx.fill();
+          });
+        const pHubs = hubs.map(h => rotateVec(h, cosA, sinA, cosT, sinT));
         links.forEach(([aIdx, bIdx], idx) => {
-          const a = projectedHubs[aIdx];
-          const b = projectedHubs[bIdx];
+          const a = pHubs[aIdx], b = pHubs[bIdx];
           if (a.z < -0.35 && b.z < -0.35) return;
-
-          const midX = (a.sx + b.sx) * 0.5;
-          const midY = (a.sy + b.sy) * 0.5 - 26;
-          const visibility = Math.max(0.18, Math.min(0.85, ((a.z + b.z) * 0.5 + 1) * 0.5));
-
-          ctx.strokeStyle = `rgba(56, 189, 248, ${visibility * 0.55})`;
-          ctx.lineWidth = 1.15;
-          ctx.beginPath();
-          ctx.moveTo(a.sx, a.sy);
-          ctx.quadraticCurveTo(midX, midY, b.sx, b.sy);
-          ctx.stroke();
-
-          // Traveling AI signal packet along arc
-          const t = (pulseT + idx * 0.14) % 1;
-          const invT = 1 - t;
-          const px = invT * invT * a.sx + 2 * invT * t * midX + t * t * b.sx;
-          const py = invT * invT * a.sy + 2 * invT * t * midY + t * t * b.sy;
-
-          ctx.fillStyle = `rgba(125, 211, 252, ${visibility})`;
-          ctx.beginPath();
-          ctx.arc(px, py, 2.3, 0, Math.PI * 2);
-          ctx.fill();
+          const midX = (a.sx + b.sx) * 0.5, midY = (a.sy + b.sy) * 0.5 - 26;
+          const vis = Math.max(0.18, Math.min(0.85, ((a.z + b.z) * 0.5 + 1) * 0.5));
+          ctx.strokeStyle = "rgba(56, 189, 248, " + (vis * 0.55) + ")"; ctx.lineWidth = 1.15;
+          ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.quadraticCurveTo(midX, midY, b.sx, b.sy); ctx.stroke();
+          const t = (pulseT + idx * 0.14) % 1, invT = 1 - t;
+          ctx.fillStyle = "rgba(125, 211, 252, " + vis + ")";
+          ctx.beginPath(); ctx.arc(invT * invT * a.sx + 2 * invT * t * midX + t * t * b.sx, invT * invT * a.sy + 2 * invT * t * midY + t * t * b.sy, 2.3, 0, Math.PI * 2); ctx.fill();
         });
-
-        // Draw AI system hub nodes
-        projectedHubs.forEach((h, i) => {
+        pHubs.forEach((h, i) => {
           if (h.z < -0.25) return;
-          const alpha = Math.max(0.25, (h.z + 1) * 0.55);
-          const pulseRadius = 5 + ((pulseT * 12 + i * 2) % 6);
-
-          ctx.strokeStyle = `rgba(167, 139, 250, ${alpha * 0.5})`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.arc(h.sx, h.sy, pulseRadius, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.fillStyle = `rgba(244, 244, 255, ${alpha})`;
-          ctx.beginPath();
-          ctx.arc(h.sx, h.sy, 2.8 * h.scale, 0, Math.PI * 2);
-          ctx.fill();
+          const a = Math.max(0.25, (h.z + 1) * 0.55);
+          ctx.strokeStyle = "rgba(167, 139, 250, " + (a * 0.5) + ")"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(h.sx, h.sy, 5 + ((pulseT * 12 + i * 2) % 6), 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = "rgba(244, 244, 255, " + a + ")";
+          ctx.beginPath(); ctx.arc(h.sx, h.sy, 2.8 * h.scale, 0, Math.PI * 2); ctx.fill();
         });
-
-        angle += 0.0042;
-        pulseT = (pulseT + 0.006) % 1;
-        requestAnimationFrame(render);
+        angle += 0.0042; pulseT = (pulseT + 0.006) % 1; requestAnimationFrame(render);
       }
-
       render();
     })();
   </script>
